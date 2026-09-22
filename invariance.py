@@ -194,12 +194,92 @@ def rank(spec: dict) -> int:
     return 0
 
 
+def bank(spec: dict) -> int:
+    """The full cross: generated questions x deterministic transforms, per item.
+
+    The agent writes the subject list and the state. It writes no questions: those
+    are the predicate grammar crossed against the subjects, so breadth is mechanical
+    and cannot carry the agent's framing."""
+    import transforms, questionbank
+    qs_all = questionbank.build(spec["subjects"])
+    tf_n = len(transforms.TRANSFORMS)
+    print(f"  {len(spec['subjects'])} subjects -> {len(qs_all)} distinct questions "
+          f"x {tf_n} transforms = {len(qs_all)*tf_n} judgments per item, "
+          f"{len(qs_all)*tf_n*len(spec['items'])} total\n")
+    rows, cost = [], 0.0
+    percell = {}
+    for name, text in spec["items"].items():
+        state = dict(spec["state"]); state["configuration"] = text
+        keep_med, dropped = [], 0
+        for batch in questionbank.batches(qs_all):
+            qs, meta = {}, {}
+            for qi, qt in enumerate(batch):
+                for ti, (_, rendered, inv) in enumerate(transforms.build(qt)):
+                    k = f"q{qi}t{ti}"; qs[k] = {"type": "noul", "instructions": rendered}
+                    meta[k] = (qi, inv)
+            r = _call(state, qs); cost += r["usage"]["cost"]
+            for qi, qt in enumerate(batch):
+                pres = [r["answers"][k]["noul"] for k, (q, i) in meta.items() if q == qi and not i]
+                invs = [r["answers"][k]["noul"] for k, (q, i) in meta.items() if q == qi and i]
+                med = st.median(pres); spread = _pct(pres, 0.90) - _pct(pres, 0.10)
+                coh = abs(med + st.median(invs) - 1.0) if invs else 0.0
+                if spread <= SPREAD_GATE and coh <= 0.20:
+                    keep_med.append(med); percell.setdefault(qt, {})[name] = med
+                else:
+                    dropped += 1
+        gm = (math.prod(keep_med) ** (1.0 / len(keep_med))) if keep_med else float("nan")
+        rows.append((name, gm, len(keep_med), dropped))
+        print(f"  {name[:30]:<30} geomean {gm:.4f}   usable {len(keep_med):>3}/{len(qs_all)}"
+              f"   dropped {dropped}")
+    json.dump({q: v for q, v in percell.items()}, open("/tmp/invariance_matrix.json", "w"))
+    rows.sort(key=lambda x: -x[1])
+    print(f"\n  ALL QUESTIONS (geometric mean) — expect this to be FLAT: most questions")
+    print(f"  do not discriminate, and averaging them washes out the ones that do.")
+    for n, gm, k, d in rows:
+        print(f"    {n[:34]:<34} {gm:.4f}   on {k} usable questions")
+
+    # Rank on the questions that SEPARATE. The cut is the gap distribution's own
+    # top decile -- derived from the data, not chosen.
+    gaps = []
+    for q, per in percell.items():
+        if len(per) == len(spec["items"]):
+            v = list(per.values()); gaps.append((max(v) - min(v), q, per))
+    gaps.sort(reverse=True)
+    if gaps:
+        cut = gaps[max(0, int(0.10 * len(gaps)))][0]
+        sel = [(g, q, per) for g, q, per in gaps if g >= cut]
+        print(f"\n  DISCRIMINATING SUBSET: {len(sel)} of {len(gaps)} questions with gap >= "
+              f"{cut:.2f} (the gap distribution's own top decile)")
+        srow = []
+        for name in spec["items"]:
+            vals = [per[name] for _, _, per in sel]
+            srow.append((name, math.prod(vals) ** (1.0 / len(vals))))
+        srow.sort(key=lambda x: -x[1])
+        print(f"  RANKED on the subset that actually separates:")
+        for n, gm in srow:
+            print(f"    {n[:34]:<34} {gm:.4f}")
+    disc = []
+    for q, per in percell.items():
+        if len(per) >= len(spec["items"]) - 1:
+            v = list(per.values()); disc.append((max(v) - min(v), q, per))
+    disc.sort(reverse=True)
+    print(f"\n  MOST DISCRIMINATING QUESTIONS (widest spread across configurations)")
+    for gap, q, per in disc[:6]:
+        top = max(per, key=per.get); bot = min(per, key=per.get)
+        print(f"    gap {gap:.2f}  {q[:76]}")
+        print(f"              high {top[:26]} {per[top]:.2f} | low {bot[:26]} {per[bot]:.2f}")
+    print(f"\n  ${cost:.4f}")
+    return 0
+
+
 if __name__ == "__main__":
     flags = {a for a in sys.argv[1:] if a.startswith("--")}
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if not args:
         sys.exit(__doc__)
     spec = json.load(open(args[0]))
+    if "--bank" in flags:
+        sys.exit(bank(spec))
     if "--rank" in flags:
         sys.exit(rank(spec))
     sys.exit(invariance(spec) if "--paraphrases" in flags else transformed(spec))

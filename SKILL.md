@@ -81,6 +81,22 @@ drawn the conclusion — which is the common failure. A tautology with a monoton
 a bootstrap-robust +14.11pp gap survived a human read for hours because the constant numerator
 that killed it was sitting in the data, unconnected. Scored 0.160 the moment it was in the state.
 
+## The frame is the tell, not the vocabulary
+
+A hedge-word scan will tell you that you rarely hedge. It is measuring the wrong object.
+"One flag", "worth noting", "the honest limit", "that said" contain no hedge vocabulary and
+are the actual shape: report the result, then staple a qualifier to it so the whole reads as
+balanced.
+
+Measured across 4,824 assistant turns: **139 frame hits, 0.029/turn — and 36 of them in the
+single session in which this tool was built**, by the agent building it, while it was being
+corrected for exactly that. The frame is invisible from the inside because it is the default
+shape of the prose, which is why the check has to be mechanical.
+
+`questionbank.caveat_frames(draft)` returns the frames present. Each one introduces a claim
+that has not been scored. Either run it through the panel or delete the sentence. Do not ship
+it as an aside.
+
 ## Do not
 
 - Do not ensemble identical calls. Repeats are near-deterministic — σ = 0.004 over ten. You get
