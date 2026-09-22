@@ -30,6 +30,7 @@ Requires OPENROUTER_API_KEY. Model served at /api/alpha/decisions (a decisions m
 from __future__ import annotations
 
 import json
+import math
 import os
 import statistics as st
 import sys
@@ -135,24 +136,61 @@ def invariance(spec: dict) -> int:
 
 
 def rank(spec: dict) -> int:
-    qs = {k: {"type": "noul", "instructions": k} for k in spec["questions"]}
-    rows, cost = [], 0.0
+    """Rank items against questions, with EVERY question invarianced.
+
+    A single phrasing per question is not a measurement -- it is one reading, which
+    is the thing this tool exists to refuse. Each question is expanded through the
+    same deterministic transforms as the single-claim path, so every cell carries a
+    median, a spread and a coherence error. A cell whose question is surface-sensitive
+    or incoherent is reported and EXCLUDED from the product rather than silently
+    ranked on."""
+    import transforms
+    qtexts = list(spec["questions"])
+    rows, cost, flagged = [], 0.0, []
     for name, text in spec["items"].items():
         state = dict(spec["state"]); state["item"] = text
-        r = _call(state, qs)
-        v = {k: r["answers"][k]["noul"] for k in qs}
-        prod = 1.0
-        for x in v.values():
-            prod *= x
-        rows.append((name, v, prod)); cost += r["usage"]["cost"]
+        qs, meta = {}, {}
+        for qi, qt in enumerate(qtexts):
+            for ti, (tn, rendered, inv) in enumerate(transforms.build(qt)):
+                key = f"q{qi}t{ti}"
+                qs[key] = {"type": "noul", "instructions": rendered}
+                meta[key] = (qi, inv)
+        r = _call(state, qs); cost += r["usage"]["cost"]
+        cell = {}
+        for qi in range(len(qtexts)):
+            keep = [r["answers"][k]["noul"] for k, (q, inv) in meta.items() if q == qi and not inv]
+            invs = [r["answers"][k]["noul"] for k, (q, inv) in meta.items() if q == qi and inv]
+            med = st.median(keep); spread = _pct(keep, 0.90) - _pct(keep, 0.10)
+            coh = abs(med + st.median(invs) - 1.0) if invs else 0.0
+            ok = spread <= SPREAD_GATE and coh <= 0.20
+            if not ok:
+                flagged.append((name, qtexts[qi], med, spread, coh))
+            cell[qi] = (med, spread, coh, ok)
+        kept = [cell[qi][0] for qi in range(len(qtexts)) if cell[qi][3]]
+        # GEOMETRIC MEAN, not product: excluded cells leave items with different
+        # factor counts, and a raw product rewards an item for having had a
+        # question thrown out.
+        prod = (math.prod(kept) ** (1.0 / len(kept))) if kept else float("nan")
+        rows.append((name, cell, prod))
     rows.sort(key=lambda x: -x[2])
-    keys = list(qs)
-    print("  " + "item".ljust(26) + "".join(k[:18].rjust(20) for k in keys) + "product".rjust(10))
-    for name, v, prod in rows:
-        print("  " + name[:26].ljust(26) + "".join(f"{v[k]:>20.2f}" for k in keys)
-              + f"{prod:>10.3f}")
-    print(f"\n  {len(rows)} items x {len(keys)} questions, ${cost:.5f}")
-    print("  Top of the list is where to look first. It is a ranking, not a verdict.")
+    print("  " + "item".ljust(26) + "".join(f"q{i}  med/sprd/coh".rjust(22)
+                                            for i in range(len(qtexts))) + "geomean".rjust(9))
+    for name, cell, prod in rows:
+        line = "  " + name[:26].ljust(26)
+        for qi in range(len(qtexts)):
+            m, sp, co, ok = cell[qi]
+            line += f"{m:.2f}/{sp:.2f}/{co:.2f}{'' if ok else '!'}".rjust(22)
+        print(line + f"{prod:>9.3f}")
+    for i, q in enumerate(qtexts):
+        print(f"  q{i}: {q}")
+    if flagged:
+        print(f"\n  {len(flagged)} cell(s) EXCLUDED from the product — question was "
+              f"surface-sensitive or incoherent for that item:")
+        for n, q, m, sp, co in flagged[:8]:
+            print(f"    {n[:22]:<22} spread {sp:.2f} coh {co:.2f}  {q[:60]}")
+    print(f"\n  {len(rows)} items x {len(qtexts)} questions x "
+          f"{len(transforms.TRANSFORMS)} transforms = "
+          f"{len(rows)*len(qtexts)*len(transforms.TRANSFORMS)} judgments, ${cost:.5f}")
     return 0
 
 
