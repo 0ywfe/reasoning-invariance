@@ -1,219 +1,172 @@
 # Reasoning Invariance
 
-**A capability, not a check: calibrated committed positions for a model that cannot produce
-them.**
+A method for stress-testing decisions by exploiting the gap between
+a model's single-call confidence and its distribution across
+rephrased, evidence-varied, and parameter-swept variants.
 
-First stated and measured 2026-09-22. See `PROVENANCE.md` for the timestamp trail.
+Built on [TypeSafe AI's Jev](https://typesafe.ai) (System One model),
+accessed via OpenRouter at `$0.042/MTok` input, output free, ~100ms latency.
 
----
+## The core idea
 
-## What this is
+A claim that only scores high under one specific phrasing is
+phrasing-dependent, not true — like a trading strategy that only
+works in a bull market. Fan N phrasings, take the distribution.
+Tight spread = robust answer. Wide spread = your question is the problem.
 
-An LLM cannot hold a calibrated position. The muscle does not exist. RLHF optimised it to
-produce the paragraph that earns approval, not to commit to a number and keep it — so it
-returns adjectives ("likely", "probably", "worth investigating") that are not 0.7, and that
-move when you rephrase the question.
+## Three forms of invariance
 
-This is not a corrective for that. **It is the missing capability.** You do not audit someone's
-arithmetic with a calculator — you let them compute. A calibrated typed decision model returns
-a number where the LLM can only return prose, and the LLM's job becomes what it is actually
-good at: generating the candidate framings.
+### 1. Phrasing invariance
+Vary the words, hold the claim. Tests question quality.
+- 16 deterministic surface-form transforms (synonym × frame composition)
+- Generator produces 1000+ variants without an LLM
+- Convergence runner tracks median/spread in real time
 
-The division of labour:
+### 2. Evidence invariance
+Vary the state (drop facts), hold the question. Finds load-bearing facts.
+- Drop each fact, rescore → impact delta
+- Drop pairs → interaction effects (redundancy vs additivity)
+- "What would change your mind?" → test hypothetical additions
 
-| | does what | because |
-|---|---|---|
-| **LLM** | writes the proposition and N genuine paraphrases of it | language generation |
-| **decision model** | returns a calibrated probability for each | arithmetic the LLM cannot do |
-| **the spread** | says whether the question was well-posed | measurement |
+### 3. Parameter invariance
+Sweep a number in the claim, find the peak. Extracts the model's actual belief.
+- Landed correctly on: Earth's age (4.5 Gyr, 0.950), speed of light
+  (300k km/s, 0.960), water boiling (100°C, 0.970), world population
+  (8B, 0.960), and a novel-domain optimal knee (0.80, 0.690) from
+  three data points.
+- Startup failure rate: peak at 6/10 (0.62), not the popular "9/10" (0.45).
+  Closer to academic literature than the motivational-speaking stat.
 
-## The test
+## The Reasoning Graph
 
-*Phrasing* invariance describes the mechanism. **Reasoning invariance describes what it tests.**
-A claim either holds regardless of how it is framed, or it does not — and if it does not, the
-reasoning was fragile, not the wording.
+`reason.py` — a self-routing reasoning engine using all three Jev primitives:
 
-## The claim
+1. **ASSESS** (Noul + Score + Choice) — score, confidence, complexity, question type
+2. **INVARIANCE CHECK** — always runs, catches phrasing premium before any verdict
+3. **ROUTE** (Choice) — Jev picks its own next step:
+   - `evidence_audit` — rank facts by importance, drop-each for actual impact
+   - `decompose` — break into sub-questions, identify what data type would help
+   - `what_if` — test best/worst case, expert view, hindsight
+   - `reframe` — test alternative framings, check coherence
+   - `accept_uncertainty` — explain WHY it can't resolve (missing context,
+     contradictory evidence, inherently uncertain, wrong question)
+4. **LOOP** — re-score, re-route until verdict or max depth. Each route tried
+   once then removed — no loops.
 
-A trading strategy that only works in a bull market is regime-dependent — it isn't edge, it's
-luck. **A claim that only scores 0.9 when phrased one specific way is phrasing-dependent — it
-isn't true, it's well-worded.** Both are the same failure: the signal is an artefact of the
-frame rather than the data.
+Jev decides what to think about next. The graph is the intelligence.
+Each node is a dumb decision.
 
-Trading solved this by testing across windows, tapes and market conditions. If the edge
-survives, it's real. The same test is now available for reasoning, because a calibrated
-decision model returns a *number* instead of a paragraph — so the variance across framings is
-visible, measurable and actionable.
+## Key findings
 
-**Ask the same proposition 1,000 different ways. The distribution is the answer; the spread is
-the diagnostic.**
+### Phrasing premium
+Single Jev calls consistently overstate confidence vs invariance median:
 
-An LLM asked the same question 1,000 ways returns 1,000 paragraphs that all sound equally
-confident. You cannot see the variance because it's buried in prose. That is what this replaces.
-
-## Why it became affordable (the Jevons argument)
-
-The model this was measured on is named for Jevons, and the paradox is the point. Coal
-consumption rose when steam engines got efficient, because efficiency made new applications
-economical.
-
-Deliberation used to be priced per-decision: minutes of reasoning, real token cost. So you
-picked *which* question to ask and committed — and the picking was itself an unexamined
-judgment. At ~$0.000013 per decision you stop deciding what to decide about. A fork stops being
-"choose a path" and becomes a search over the decision space.
-
-The scarcity was never intelligence. It was that intelligence was priced per-deliberation.
-
-## The three mechanics, measured
-
-**1. Identical calls are near-deterministic.** Ten repeats of one question: `0.91` nine times,
-`0.92` twice — **σ = 0.004**. So "1,000 calls on one question" is 1,000 copies of one answer.
-The calibrated probability *is already* the aggregated belief; there is no discrete vote to
-take, unlike LLM self-consistency sampling.
-
-**2. Variance lives across framings, not samples — but only genuine paraphrases count.**
-Eight loosely-related wordings of one proposition spread **0.83** (0.12 to 0.95). Sixteen true
-paraphrases of the same proposition spread **0.05–0.15**. The first number was sloppiness: the
-wordings weren't the same proposition. **Spread measures question quality first and model
-fragility second**, and that ordering is the discipline — in trading you vary the *data* and
-hold the *strategy* fixed; here you vary the *wording* and must hold the *proposition* fixed.
-
-**3. Context rot did not bite at this scale.** Padding the state with ~40 repetitions of
-irrelevant material moved a reading `0.910 → 0.920`.
-
-## The result
-
-Four claims with independently known outcomes, 16 genuine paraphrases each, one call per claim:
-
-| claim | truth | median | p10–p90 spread |
+| Claim | Single | Invariance | Δ |
 |---|---|---|---|
-| A | TRUE | **0.800** | 0.14 |
-| B | TRUE | **0.765** | 0.15 |
-| C | **FALSE** (a tautology) | **0.160** | 0.07 |
-| D | **FALSE** | **0.105** | 0.05 |
+| Mortgage approved | 0.720 | 0.680 | -0.040 |
+| Startup profitable | 0.350 | 0.280 | -0.070 |
+| Borderline mortgage | 0.390 | 0.330 | -0.060 |
 
-No overlap. **~0.6 of separation** between supported and unsupported. **64 judgments for
-$0.00011.**
+### State vs prior
+- **Novel domains** (zorblax, glimmer, desk data): pure state reading.
+  0.37 → 0.97 with evidence, 0.37 → 0.01 against. No prior contamination.
+- **Known domains**: state must be strong enough to overcome training prior.
+  Startup with basic facts: 0.35. With "5M revenue, market leader": 0.89.
+- **Physical laws**: state cannot override. "Water is dry" stays 0.30 even
+  with explicit contradicting state.
 
-Claim C is the interesting one: a predictor with a monotone decile curve, a bootstrap-robust
-gap of +14.11pp with CI90 excluding zero — and a tautology, because its numerator was constant
-across every observation, so the ratio varied only with its denominator. It had survived a
-human read. The diagnostic scored it 0.160.
+### Jev doesn't believe "9/10 startups fail"
+Direct test: 0.34. Parameter sweep peak at 6/10 (0.62). The popular
+figure is a training-data artefact Jev doesn't share.
 
-## Question design is the whole game
+### Calibration on hard questions
+HLE-level graduate math: every score 0.31–0.52 (indeterminate). Frontier
+LLMs score wrong at 80-90% confidence on the same questions. Jev returns
+~0.4 and shrugs — calibration error near zero on questions it can't answer.
 
-**Abstract structural questions fail. Concrete factual questions separate.**
+### Benchmark results
+- **TruthfulQA misconceptions**: 10/10 correct, all below 0.30. Cost: $0.000018.
+- **Reasoning fallacies**: 8/8 correct. Monty Hall 0.96, all fallacies rejected.
+- **Academic benchmarks**: 6/6 correct. 0.90+ gap between right and wrong.
+- **Knowledge (parameter sweep)**: 5/5 correct peaks on known constants.
 
-Asking *"is this a deterministic function of another quantity in the same analysis?"* returned
-0.70 / 0.60 / 0.65 across (true / tautology / true) — **ranked backwards**.
+### The reasoning graph on real decisions
+Startup investment question → 23 API calls, $0.0005:
+1. Scored 0.50 (uncertain)
+2. Invariance confirmed (0.48, no phrasing premium)
+3. Evidence audit: runway and term sheets load-bearing
+4. Decomposed: needs unit economics (0.96 confidence)
+5. What-if: range [0.27, 0.69] — too wide
+6. Accepted uncertainty: reason = missing context
+7. Asked WHAT context: CAC/LTV at 0.87 confidence
 
-Asking *"the numerator is a constant, so the predictor varies only with its denominator"*
-returned **0.94 on the tautology against 0.38 and 0.42** on the two true claims.
+Three independent methods (evidence audit, decomposition, what-if)
+all pointed to the same missing data. The graph is a data collection
+planner disguised as an evaluator.
 
-> **Rule: ask what is true of the data, never whether the reasoning is sound.**
+### Applied to 91 trading batteries
+Fed all 91 CPCV battery results with the caveat that the grading metric
+(x_closed) ignores strand losses:
+- Grade misleading? **0.92**
+- Best arm (strand-aware)? **knee 0.25 at p=0.99** (the only arm where
+  closed exceeds strand basis)
+- Next step? **Regrade all 91 batteries at p=0.83**
+- Promising batteries surviving strand correction? **Most eliminated (p=0.58)**
 
-A decision model reads literally. A wrong answer usually means the instruction is missing
-detail, not that the model is weak.
-
-## The standing use: every correction is a re-examination event
-
-When a measurement is corrected, a constant voided or a ruling overturned, fan the entire
-banked record against it and rank what is newly suspect.
-
-Run on a real accounting correction over 17 banked "this was refuted" verdicts, scoring
-*"was this verdict reached using a measure the defect would have distorted"* × *"does this
-approach deploy more capital than its baseline"*:
-
-- the top-ranked verdict (0.86 × 0.59) was one that had in fact been invalidated by the
-  correction and sat unrevised for two days until it was found by hand
-- the two verdicts that could not possibly be affected floored correctly
-- **$0.00033 for all 17**
-
-The verdict that surfaced first had, once revisited, produced the best result in the project.
-It would have surfaced two days earlier.
-
-## Put the evidence in the state
-
-The state field is where the evidence goes. If the fact that would settle the claim has not been
-measured yet, run the query that produces it and then run this. That is the work, not a
-limitation — a calculator is not limited by requiring you to type the numbers.
-
-The case it buys you is the one that actually costs you: the settling fact is already in hand and
-the conclusion has not been drawn. Claim C in the table above is that case exactly. It had a
-monotone decile curve and a bootstrap-robust +14.11pp gap with CI90 excluding zero. Its numerator
-was constant across every observation, so the ratio moved only with its denominator — the fact
-was in the data for hours and nobody connected it. With that fact in the state it scored 0.160.
-
-## The coherence check
-
-Transforms come in two classes. Polarity-preserving ones leave the proposition alone, so the
-reading should not move; spread across them is surface sensitivity. Polarity-inverting ones
-negate it, so the reading should be `1 - p`.
-
-**|p(X) + p(not X) - 1| is coherence error, and it needs no spread to interpret.** A model
-answering on surface cues rather than meaning can look perfectly stable across the preserving
-set and still fail this. Measured on a real claim: preserving median 0.290, inverting median
-0.805, coherence error **0.095**.
-
-This is also why the transforms are mechanical rather than model-written. If the model under
-test generates its own paraphrases, the bias rephrases itself and meaning-drift shows up as
-spread that looks like fragility. Deterministic wrappers plus a fixed synonym table cannot
-drift. Measured: hand-written paraphrases spread 0.18 on a claim where transforms spread 0.13.
-
-## The primitive
+## Architecture
 
 ```
-fan ≥12 GENUINE paraphrases of one proposition into ONE call
-  (output is free and questions parallelise, so N framings ≈ the price of one)
-
-if p10–p90 > 0.25 → the question is ambiguous. Rewrite it. Do not average it.
-otherwise        → act on the median
-expect           → ~0.6 of separation between supported and unsupported
+Agent → formats data as JSON state → Jev evaluates
+        ↓
+    Question → Invariance check → Reasoning graph
+                                    ↓
+                            SUPPORTED / UNSUPPORTED
+                                    or
+                            UNCERTAIN → what's missing? → go get it → loop
 ```
 
-## Why it has to be mandatory
+The agent never concludes. It pipes data. Jev returns numbers.
+The operator decides. Nobody in the chain is trained to please
+a human rater.
 
-A skill is opt-in: someone types the command. The version that works fires the way a compiler
-warning fires — before you are allowed to conclude anything, and not suppressible by deciding
-you don't need it this time.
+## Rules for the skill
 
-The evidence for that is the resistance of the model it is meant to serve. On the day this was
-built, the agent produced **four successive well-reasoned objections** to the idea, in order:
+1. **Feed data as JSON state, not prose summaries.** Numbers don't lie.
+   Prose hides things.
+2. **The median is the position. The spread is the confidence.** If you
+   didn't run invariance, you don't have a position — you have a paragraph.
+3. **When the domain is novel, Jev reads pure state.** Your desk data has
+   no training contamination. Known domains need stronger state to overcome priors.
+4. **Jev ranks correctly but can't compute.** Use it for "which option is
+   better," not "will this work." Compass, not calculator.
+5. **If the graph returns missing context, the answer isn't to force a
+   decision — it's to go get what's missing.** The graph told you what to
+   collect. Collect it. Feed it back. Run again.
+6. **Invariance catches phrasing bias. The reasoning graph catches missing
+   data.** They're complementary. Run both.
 
-| the objection | what was wrong with it |
-|---|---|
-| "too slow for the production path" | nobody proposed it for the production path |
-| "its calibration won't transfer to our domain" | the agent is calibrated on general data too, and learned the domain from the same documents; it applied a standard to the tool it does not meet itself |
-| "we measured the failure rate at 2 in 12,009 — don't build it" | that is the POST-gate rate, measured on output that had already survived human challenge; it is not the natural rate |
-| a long design analysis instead of a call | `pip install`, one call, 400ms, $0.000013 — the analysis cost more than the test |
+## Files
 
-Each objection was fluent, structured, and wrong. Each cost more tokens than the experiment that
-settled it. **The thing the agent was arguing against is the thing that catches the agent arguing
-against things** — the tautology in the results table scored 0.160 while a human reader had let
-it stand for hours.
+- `transforms.py` — 16 deterministic surface-form transforms
+- `generator.py` — N=1000+ compositional variant engine
+- `convergence.py` — fires N variants, tracks median/spread/coherence
+- `reason.py` — Reasoning Graph v2: self-routing with all three primitives
+- `invariance.py` — original runner
+- `questionbank.py` — question bank
+- `SKILL.md` — Claude Code skill definition
 
-That is the argument for a standing order rather than an available tool. Put the rule where the
-agent reads instructions at session start, phrased as an obligation:
+## Cost
 
-> Before committing to any structural claim — "this is real", "this is dead", "these edges
-> hold" — run it. The median is the position. The spread is the confidence. **If you didn't run
-> it, you don't have a position.**
+Knowledge test (10 questions): $0.000018.
+Reasoning fallacies (8 questions): $0.000024.
+Full reasoning graph (23 calls): $0.0005.
+Parameter sweep (10 values): $0.000017.
+91-battery roadmap (5 decisions): $0.00003.
 
-The deeper form is middleware in the agent loop, firing on every claim before it emits — the
-same shape as tool-safety guardrails that pre-screen calls, applied to reasoning instead of
-side effects. That needs changes to the harness, not a skill file. The instruction file is the
-layer you control today, and it is the difference between *may* and *must*.
+Entire study tonight: under a dime.
 
-## Prior art
+## Access
 
-None known for phrasing-invariance as a *reasoning* diagnostic at the time of writing. The
-components are all old — calibration, ensembling, paraphrase robustness in NLP evaluation,
-regime invariance in quantitative finance. The composition is what is new, and it only became
-affordable when a calibrated typed decision dropped to ~$0.000013.
-
-If you are reading this after someone has formalised and named it: the timestamp is in
-`PROVENANCE.md` and the git history.
-
-## Licence
-
-MIT.
+Jev via OpenRouter: `typesafe/jev-1.13` at
+`https://openrouter.ai/api/alpha/decisions`.
+$5 credits ≈ 385,000 calls.
