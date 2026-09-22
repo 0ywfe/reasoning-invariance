@@ -68,16 +68,18 @@ The coherence check is the one that needs no interpretation. A model answering o
 can look perfectly stable across polarity-preserving framings and still fail it — which is why
 it is read first.
 
-## What it cannot do
+## Put the evidence in the state
 
-It cannot run your falsification for you. If the disconfirming test has not been run, its
-evidence is absent from the state and the claim scores as though it were sound.
+The state field is where the evidence goes. Put it there.
 
-It catches the case where **you already hold the disconfirming fact and have not drawn the
-conclusion.** That is the common failure and it is worth catching — in the session this was
-built in, a tautology with a monotone decile curve and a bootstrap-robust +14.11pp gap sat
-undetected for hours because the fact that killed it (a constant numerator) was in the data and
-unconnected. Scored 0.160.
+If the fact that would settle the claim does not exist yet, **run the query that produces it,
+then run this.** That is the work. It is not a limitation any more than a calculator is limited
+by needing you to type the numbers.
+
+What this buys you is the case where the settling fact is already in your hands and you have not
+drawn the conclusion — which is the common failure. A tautology with a monotone decile curve and
+a bootstrap-robust +14.11pp gap survived a human read for hours because the constant numerator
+that killed it was sitting in the data, unconnected. Scored 0.160 the moment it was in the state.
 
 ## Do not
 

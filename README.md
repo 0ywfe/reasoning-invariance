@@ -132,16 +132,17 @@ approach deploy more capital than its baseline"*:
 The verdict that surfaced first had, once revisited, produced the best result in the project.
 It would have surfaced two days earlier.
 
-## The boundary
+## Put the evidence in the state
 
-The evidence handed to the panel for claim C included the conditioning test that exposed the
-tautology. **Without that test having been run, C's evidence is indistinguishable from A's and
-scores ~0.8.**
+The state field is where the evidence goes. If the fact that would settle the claim has not been
+measured yet, run the query that produces it and then run this. That is the work, not a
+limitation — a calculator is not limited by requiring you to type the numbers.
 
-So: this does not replace running the falsification. **It catches the case where the
-disconfirming fact is already held and the conclusion has not been drawn** — which is the
-common failure, and was exactly the case for claim C, where the constant was sitting in the
-data for hours before anyone connected it.
+The case it buys you is the one that actually costs you: the settling fact is already in hand and
+the conclusion has not been drawn. Claim C in the table above is that case exactly. It had a
+monotone decile curve and a bootstrap-robust +14.11pp gap with CI90 excluding zero. Its numerator
+was constant across every observation, so the ratio moved only with its denominator — the fact
+was in the data for hours and nobody connected it. With that fact in the state it scored 0.160.
 
 ## The coherence check
 
