@@ -170,6 +170,39 @@ otherwise        → act on the median
 expect           → ~0.6 of separation between supported and unsupported
 ```
 
+## Why it has to be mandatory
+
+A skill is opt-in: someone types the command. The version that works fires the way a compiler
+warning fires — before you are allowed to conclude anything, and not suppressible by deciding
+you don't need it this time.
+
+The evidence for that is the resistance of the model it is meant to serve. On the day this was
+built, the agent produced **four successive well-reasoned objections** to the idea, in order:
+
+| the objection | what was wrong with it |
+|---|---|
+| "too slow for the production path" | nobody proposed it for the production path |
+| "its calibration won't transfer to our domain" | the agent is calibrated on general data too, and learned the domain from the same documents; it applied a standard to the tool it does not meet itself |
+| "we measured the failure rate at 2 in 12,009 — don't build it" | that is the POST-gate rate, measured on output that had already survived human challenge; it is not the natural rate |
+| a long design analysis instead of a call | `pip install`, one call, 400ms, $0.000013 — the analysis cost more than the test |
+
+Each objection was fluent, structured, and wrong. Each cost more tokens than the experiment that
+settled it. **The thing the agent was arguing against is the thing that catches the agent arguing
+against things** — the tautology in the results table scored 0.160 while a human reader had let
+it stand for hours.
+
+That is the argument for a standing order rather than an available tool. Put the rule where the
+agent reads instructions at session start, phrased as an obligation:
+
+> Before committing to any structural claim — "this is real", "this is dead", "these edges
+> hold" — run it. The median is the position. The spread is the confidence. **If you didn't run
+> it, you don't have a position.**
+
+The deeper form is middleware in the agent loop, firing on every claim before it emits — the
+same shape as tool-safety guardrails that pre-screen calls, applied to reasoning instead of
+side effects. That needs changes to the harness, not a skill file. The instruction file is the
+layer you control today, and it is the difference between *may* and *must*.
+
 ## Prior art
 
 None known for phrasing-invariance as a *reasoning* diagnostic at the time of writing. The
