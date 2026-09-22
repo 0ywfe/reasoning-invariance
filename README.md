@@ -143,6 +143,22 @@ disconfirming fact is already held and the conclusion has not been drawn** — w
 common failure, and was exactly the case for claim C, where the constant was sitting in the
 data for hours before anyone connected it.
 
+## The coherence check
+
+Transforms come in two classes. Polarity-preserving ones leave the proposition alone, so the
+reading should not move; spread across them is surface sensitivity. Polarity-inverting ones
+negate it, so the reading should be `1 - p`.
+
+**|p(X) + p(not X) - 1| is coherence error, and it needs no spread to interpret.** A model
+answering on surface cues rather than meaning can look perfectly stable across the preserving
+set and still fail this. Measured on a real claim: preserving median 0.290, inverting median
+0.805, coherence error **0.095**.
+
+This is also why the transforms are mechanical rather than model-written. If the model under
+test generates its own paraphrases, the bias rephrases itself and meaning-drift shows up as
+spread that looks like fragility. Deterministic wrappers plus a fixed synonym table cannot
+drift. Measured: hand-written paraphrases spread 0.18 on a claim where transforms spread 0.13.
+
 ## The primitive
 
 ```

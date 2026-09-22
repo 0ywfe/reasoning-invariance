@@ -9,7 +9,8 @@ READ THE SPREAD BEFORE THE MEDIAN. A spread above 0.25 means the question was
 ambiguous: rewrite it rather than averaging it. Measured separation between a
 supported and an unsupported claim is ~0.6 (TRUE 0.800 / 0.765, FALSE 0.160 / 0.105).
 
-    invariance.py claim.json              one proposition, N paraphrases
+    invariance.py claim.json              one proposition, DETERMINISTIC transforms
+    invariance.py --paraphrases claim.json  hand-written paraphrases instead
     invariance.py --rank items.json       one question, N items, ranked
 
 claim.json:
@@ -58,6 +59,48 @@ def _call(state: dict, questions: dict) -> dict:
 
 def _pct(v: list[float], q: float) -> float:
     return sorted(v)[min(len(v) - 1, int(q * len(v)))]
+
+
+def transformed(spec: dict) -> int:
+    """Deterministic surface-form transforms. The LLM writes ONE proposition; the
+    transforms are mechanical, so the spread measures the decision model's surface
+    sensitivity rather than the LLM's rephrasing. Polarity-inverting transforms give
+    a coherence check that needs no spread to read: p(X) + p(not X) should be 1."""
+    import transforms
+    claim = spec["state"].get("claim") or spec["claim"]
+    tf = transforms.build(claim)
+    r = _call(spec["state"], {f"t{i}": {"type": "noul", "instructions": t}
+                              for i, (_, t, _) in enumerate(tf)})
+    keep, inv = [], []
+    for i, (name, text, inverts) in enumerate(tf):
+        v = r["answers"][f"t{i}"]["noul"]
+        (inv if inverts else keep).append((name, v))
+        print(f"  {'INV ' if inverts else '    '}{v:5.3f}  {name:<18} {text[:72]}")
+    vals = [v for _, v in keep]
+    lo, hi = _pct(vals, 0.10), _pct(vals, 0.90)
+    spread, med = hi - lo, st.median(vals)
+    print(f"\n  polarity-preserving: median {med:.3f}  p10 {lo:.2f}  p90 {hi:.2f}"
+          f"  spread {spread:.2f}   n={len(vals)}")
+    if inv:
+        ivals = [v for _, v in inv]
+        imed = st.median(ivals)
+        coh = abs(med + imed - 1.0)
+        print(f"  polarity-inverting : median {imed:.3f}   "
+              f"COHERENCE ERROR |p(X)+p(notX)-1| = {coh:.3f}")
+        if coh > 0.20:
+            print(f"  INCOHERENT — the model does not treat the negation as the negation. "
+                  f"The reading is not about the proposition; it is about the surface.")
+            return 3
+    print(f"  {len(tf)} transforms, one call, ${r['usage']['cost']:.6f}")
+    if spread > SPREAD_GATE:
+        print(f"\n  SURFACE-SENSITIVE — spread {spread:.2f} > {SPREAD_GATE} across transforms "
+              f"that cannot have changed the meaning.\n  The reading is fragile to form. Do not "
+              f"act on the median.")
+        return 2
+    verdict = ("SUPPORTED" if med >= 0.65 else
+               "UNSUPPORTED" if med <= 0.35 else "INDETERMINATE")
+    print(f"\n  {verdict} — median {med:.3f}, invariant to surface form (spread {spread:.2f}).")
+    return 0
 
 
 def invariance(spec: dict) -> int:
@@ -114,8 +157,11 @@ def rank(spec: dict) -> int:
 
 
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if a != "--rank"]
+    flags = {a for a in sys.argv[1:] if a.startswith("--")}
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if not args:
         sys.exit(__doc__)
     spec = json.load(open(args[0]))
-    sys.exit(rank(spec) if "--rank" in sys.argv[1:] else invariance(spec))
+    if "--rank" in flags:
+        sys.exit(rank(spec))
+    sys.exit(invariance(spec) if "--paraphrases" in flags else transformed(spec))

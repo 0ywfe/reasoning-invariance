@@ -38,31 +38,35 @@ detail, not that the model is weak.
 
 ## How to use it
 
-1. **State the proposition once, precisely.** One claim. Not a compound.
-2. **Sanity-check with ONE paraphrase first.** Twelve real paraphrases of a precise technical
-   claim is slow work, and if you write sloppy ones the spread measures your sloppiness rather
-   than the claim's fragility. So fire a single clean framing first. If it returns something
-   absurd — near 0 on a claim you know is solid, near 1 on one you know is broken — the
-   PROPOSITION STATEMENT is wrong, not the paraphrase count. Fix the state and the wording
-   before spending the effort on twelve. One call, $0.000013.
-3. **Write ≥12 GENUINE paraphrases.** This is the part only you can do, and the part that
-   decides whether the result means anything. They must be the *same proposition* in different
-   words — not related propositions. If two of your paraphrases could have different truth
-   values, you have written two questions and the spread will measure your sloppiness rather
-   than the claim's fragility.
-4. **Assemble the state**: the claim, and the evidence that actually exists. Not the whole
-   transcript — the specific numbers.
-5. **Run** `python3 invariance.py state.json` (see `invariance.py`; one call, all paraphrases,
-   output is free so N framings cost about the same as one).
-6. **Read the spread before the median.**
+1. **State the proposition once, precisely.** One claim, not a compound. This is the only
+   sentence you write, and it is the only place your bias can enter.
+2. **Sanity-check it with one call.** If a single clean reading comes back absurd — near 0 on
+   something you know is solid — the PROPOSITION is wrong, not the transform count. Fix the
+   state and the wording first. $0.000013.
+3. **Let `transforms.py` generate the framings.** Do NOT write paraphrases yourself: the model
+   whose claim is under test would be rephrasing its own bias, and any meaning-drift shows up
+   as spread that looks like fragility but is sloppiness. The transforms are wrappers and a
+   fixed synonym table — mechanical, reproducible, meaning-preserving by construction — so the
+   spread measures ONE thing: sensitivity to surface form. (`--paraphrases` remains for the
+   case where you genuinely need hand-written framings; the spread then means less.)
+4. **Assemble the state**: the claim and the evidence that actually exists. The specific
+   numbers, not the transcript.
+5. **Run** `python3 invariance.py claim.json`.
+6. **Read the coherence error, then the spread, then the median.**
 
 ```
-p10–p90 > 0.25   →  the question is ambiguous. REWRITE IT. Do not average it,
-                    do not report the median, do not act on it.
-p10–p90 ≤ 0.25   →  act on the median.
-separation        →  expect ~0.6 between a supported and an unsupported claim;
-                    measured TRUE 0.800 / 0.765 against FALSE 0.160 / 0.105.
+|p(X) + p(not X) - 1| > 0.20  →  INCOHERENT. The model is reading the surface, not the
+                                 proposition. The number means nothing. Stop.
+p10-p90 > 0.25                →  SURFACE-SENSITIVE. The reading moves under transforms
+                                 that cannot have changed the meaning. Do not act.
+otherwise                     →  act on the median.
+separation                    →  expect ~0.6 between supported and unsupported;
+                                 measured TRUE 0.800 / 0.765 vs FALSE 0.160 / 0.105.
 ```
+
+The coherence check is the one that needs no interpretation. A model answering on surface cues
+can look perfectly stable across polarity-preserving framings and still fail it — which is why
+it is read first.
 
 ## What it cannot do
 
