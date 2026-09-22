@@ -1,10 +1,37 @@
-# Phrasing invariance
+# Reasoning Invariance
 
-**A robustness diagnostic for reasoning, by analogy to regime invariance in trading.**
+**A capability, not a check: calibrated committed positions for a model that cannot produce
+them.**
 
 First stated and measured 2026-09-22. See `PROVENANCE.md` for the timestamp trail.
 
 ---
+
+## What this is
+
+An LLM cannot hold a calibrated position. The muscle does not exist. RLHF optimised it to
+produce the paragraph that earns approval, not to commit to a number and keep it — so it
+returns adjectives ("likely", "probably", "worth investigating") that are not 0.7, and that
+move when you rephrase the question.
+
+This is not a corrective for that. **It is the missing capability.** You do not audit someone's
+arithmetic with a calculator — you let them compute. A calibrated typed decision model returns
+a number where the LLM can only return prose, and the LLM's job becomes what it is actually
+good at: generating the candidate framings.
+
+The division of labour:
+
+| | does what | because |
+|---|---|---|
+| **LLM** | writes the proposition and N genuine paraphrases of it | language generation |
+| **decision model** | returns a calibrated probability for each | arithmetic the LLM cannot do |
+| **the spread** | says whether the question was well-posed | measurement |
+
+## The test
+
+*Phrasing* invariance describes the mechanism. **Reasoning invariance describes what it tests.**
+A claim either holds regardless of how it is framed, or it does not — and if it does not, the
+reasoning was fragile, not the wording.
 
 ## The claim
 
