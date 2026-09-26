@@ -1,9 +1,10 @@
 ---
 description: |
-  Use Jev (TypeSafe's System One model) for calibrated binary/ordinal/choice
-  decisions on any claim.  Three invariance forms strip framing, evidence,
-  and parameter bias.  The reasoning graph self-routes through uncertainty.
-  Cost: ~$0.000013 per call.  Use before committing to any structural claim.
+  Calibrated binary/ordinal/choice decisions on any claim using
+  Laya (local, free, ~47ms) or Jev (API, ~150ms, $0.042/MTok).
+  Three invariance forms strip framing, evidence, and parameter bias.
+  The reasoning graph self-routes through uncertainty.
+  Use before committing to any structural claim.
 tools:
   - convergence.py   # phrasing invariance runner
   - reason.py        # self-routing reasoning graph (all 3 primitives)
@@ -19,16 +20,22 @@ Before committing to any structural claim. The median is the position.
 The spread is the confidence. If you didn't run it, you don't have a
 position — you have a paragraph.
 
+## Backends
+
+**Laya (default):** `pip install laya` — local, free, ~47ms on M4 MPS.
+Open-source, Apache 2.0. Runs on any machine with PyTorch.
+
+**Jev (fallback):** OpenRouter API at `typesafe/jev-1.13`. $0.042/MTok
+input, output free. ~150ms + network. Set `$OPENROUTER_API_KEY`.
+
 ## Quick start
 
-### Single claim check
 ```bash
-python3 convergence.py --n 1000 --state "your context" "Your claim here"
-```
+# Phrasing invariance
+python3 convergence.py --n 1000 --state "your context" "Your claim"
 
-### Full reasoning graph
-```bash
-python3 reason.py --state "your context" "Your question here"
+# Full reasoning graph
+python3 reason.py --state "your context" "Your question"
 ```
 
 ## The three primitives
@@ -37,53 +44,24 @@ python3 reason.py --state "your context" "Your question here"
 - **Score** (ordered spectrum): `"type": "score"` — how much?
 - **Choice** (pick one): `"type": "choice"` — which one?
 
-All three in one call:
-```json
-{
-  "model": "typesafe/jev-1.13",
-  "state": "your data here — JSON preferred over prose",
-  "questions": {
-    "supported": {"type": "noul", "instructions": "claim"},
-    "severity": {"type": "score", "instructions": "how bad",
-                 "criteria": ["none", "low", "medium", "high", "critical"]},
-    "action": {"type": "choice", "instructions": "what to do",
-               "criteria": {"a": "desc", "b": "desc", "c": "desc"}}
-  }
-}
-```
-
 ## Three forms of invariance
 
 ### 1. Phrasing invariance
-Vary words, hold claim. `convergence.py` generates deterministic
-variants and tracks median/spread. Tight spread = robust. Wide = fragile.
+Vary words, hold claim. Tight spread = robust. Wide = fragile.
 
 ### 2. Evidence invariance
-Drop each fact from state, rescore. The delta is that fact's load.
-Drop pairs for interaction effects.
+Drop each fact, rescore. The delta is that fact's load.
 
 ### 3. Parameter sweep
 Sweep a number, find the peak. The peak is the model's belief.
-```python
-for v in [0.1, 0.2, ..., 1.0]:
-    score(f"The optimal value is {v}")
-# Peak = Jev's estimate
-```
 
 ## Rules
 
-1. **JSON state, not prose.** `{"revenue": [45000, 48600, ...]}` not
-   "revenue is 45k growing 8%". Numbers can't hide things.
-2. **Novel domains = pure state reading.** Your desk data has no
-   training contamination. Known domains need stronger evidence.
-3. **Jev ranks but can't compute.** Compass, not calculator.
-   Agent computes the projection, Jev evaluates if it's credible.
-4. **Missing context = go collect, not force a decision.** The graph
-   tells you what data to get. Get it. Feed it back. Run again.
-5. **Single call scores are biased upward.** Always run invariance
-   or the reasoning graph. The phrasing premium is real (0.04-0.07).
-6. **The graph uses all three primitives:** Noul evaluates, Score
-   ranks, Choice routes. Jev decides what to think about next.
+1. **JSON state, not prose.** Numbers can't hide things.
+2. **Novel domains = pure state reading.** Known domains need stronger evidence.
+3. **Compass, not calculator.** Ranks correctly, can't compute.
+4. **Missing context = go collect, not force.** The graph tells you what to get.
+5. **Single calls are biased upward.** Always run invariance or the graph.
 
 ## Interpreting results
 
@@ -95,13 +73,6 @@ for v in [0.1, 0.2, ..., 1.0]:
 
 | Spread | Meaning |
 |---|---|
-| < 0.10 | Rock solid — answer is phrasing-invariant |
-| 0.10 - 0.25 | Acceptable — mild phrasing sensitivity |
-| > 0.25 | Fragile — the question is the problem, not the answer |
-
-## API
-
-Endpoint: `https://openrouter.ai/api/alpha/decisions`
-Model: `typesafe/jev-1.13`
-Auth: `Bearer $OPENROUTER_API_KEY`
-Cost: $0.042/MTok input, output free. ~$0.000013 per call.
+| < 0.10 | Rock solid |
+| 0.10 - 0.25 | Acceptable |
+| > 0.25 | Fragile — question is the problem |

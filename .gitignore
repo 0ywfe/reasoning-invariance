@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+convergence_scores.json
+.env
